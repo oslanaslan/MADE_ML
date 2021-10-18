@@ -9,7 +9,6 @@ import pytest
 from task_Ashabokov_Aslan_inverted_index_lib import InvertedIndex
 from task_Ashabokov_Aslan_inverted_index_lib import load_documents
 from task_Ashabokov_Aslan_inverted_index_lib import build_inverted_index
-from task_Ashabokov_Aslan_inverted_index_lib import main
 
 # toad_documents tests
 
@@ -327,16 +326,45 @@ def test_query_valid_input():
     }
     inverted_index = InvertedIndex(valid_data)
 
-    assert [] == inverted_index.query([])
-    assert [1, 2, 3] == inverted_index.query(['a'])
-    assert [1, 2] == inverted_index.query(['a', 'abc'])
-    assert [2, 3] == inverted_index.query(['a', 'c'])
-    assert [2] == inverted_index.query(['abc', 'c', 'a'])
+    assert  len(set(inverted_index.query([]))) == 0
+    assert len(set([1, 2, 3]).symmetric_difference(inverted_index.query(['a']))) == 0
+    assert len(set([1, 2]).symmetric_difference(inverted_index.query(['a', 'abc']))) == 0
+    assert len(set([2, 3]).symmetric_difference(inverted_index.query(['a', 'c']))) == 0
+    assert len(set([2]).symmetric_difference(inverted_index.query(['abc', 'c', 'a']))) == 0
 
 
 # main tests
 
-def test_main_test():
-    """Test main function"""
+# def test_main_test():
+#     """Test main function"""
 
-    main()
+#     main()
+
+def test_full():
+    """Full test"""
+
+    filename = "sample.txt"
+    documents = load_documents(filename)
+    inverted_index = build_inverted_index(documents)
+    inverted_index.dump("inverted.index")
+    inverted_index = InvertedIndex.load("inverted.index")
+    document_ids = inverted_index.query(["two", "words"])
+    result = set()
+    assert len(result.symmetric_difference(set(document_ids))) == 0, (
+        "full test 1 failed\n"
+    )
+    document_ids = inverted_index.query(["text", "line"])
+    result = set([5, 7])
+    assert len(result.symmetric_difference(document_ids)) == 0, (
+        "full test 2 failed\n"
+    )
+    document_ids = inverted_index.query(["something", "else"])
+    result = set([78])
+    assert len(result.symmetric_difference(document_ids)) == 0, (
+        "full test 3 failed\n"
+    )
+    document_ids = inverted_index.query(["something", "ggvp"])
+    result = set([])
+    assert len(result.symmetric_difference(document_ids)) == 0, (
+        "full test 4 failed\n"
+    )

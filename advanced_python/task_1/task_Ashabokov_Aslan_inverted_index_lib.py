@@ -7,7 +7,6 @@ Creates Inverted Index dictionary for query searching
 from __future__ import annotations, absolute_import
 
 import os
-from collections import defaultdict
 import json
 from typing import Dict, List
 import re
@@ -76,15 +75,23 @@ class InvertedIndex:
                 raise TypeError(f"items of words must be type of {type(str)}\n\
                     Got: {type(item)}")
 
-        if len(words) == 0:
+        if len(self.data_) == 0 or len(words) == 0:
             return []
 
-        result = set(self.data_[words[0]])
+        words = [word.lower().strip() for word in words]
+
+        if words[0] in self.data_.keys():
+            result = set(self.data_[words[0]])
+        else:
+            return []
 
         for word in words:
-            result = result.intersection(set(self.data_[word]))
+            if word in self.data_.keys():
+                result = result.intersection(set(self.data_[word]))
+            else:
+                return []
 
-        result = sorted(list(result))
+        result = list(result)
         return result
 
     def dump(self, filepath: str) -> None:
@@ -113,7 +120,6 @@ class InvertedIndex:
         except:
             raise ValueError(f"Can't read JSON from file {filepath}")
 
-        cls.dict_check_(data_dict)
         return InvertedIndex(data_dict)
 
 
@@ -149,7 +155,7 @@ def load_documents(filepath: str) -> Dict[int, str]:
 def build_inverted_index(documents: Dict[int, str]) -> InvertedIndex:
     """Builds inverted index dict based on data, loaded with load_documents"""
 
-    inverted_index_dict = defaultdict(list)
+    inverted_index_dict = dict()
 
     for index in documents:
         if not isinstance(index, int):
@@ -161,23 +167,25 @@ def build_inverted_index(documents: Dict[int, str]) -> InvertedIndex:
         item_lst = [item.strip() for item in item_lst]
 
         for word in item_lst:
+            if word not in inverted_index_dict.keys():
+                inverted_index_dict[word] = list()
             inverted_index_dict[word].append(index)
 
-    inverted_index = InvertedIndex(dict(inverted_index_dict))
+    inverted_index = InvertedIndex(inverted_index_dict)
     return inverted_index
 
 
-def main() -> None:
-    """Main function"""
+# def main() -> None:
+#     """Main function"""
 
-    documents = load_documents("wikipedia_sample")
-    inverted_index = build_inverted_index(documents)
-    inverted_index.dump("inverted.index")
-    inverted_index = InvertedIndex.load("inverted.index")
-    document_ids = inverted_index.query(["two", "words"])
+#     documents = load_documents("wikipedia_sample")
+#     inverted_index = build_inverted_index(documents)
+#     inverted_index.dump("inverted.index")
+#     inverted_index = InvertedIndex.load("inverted.index")
+#     document_ids = inverted_index.query(["two", "words"])
 
-    return document_ids
+#     return document_ids
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
