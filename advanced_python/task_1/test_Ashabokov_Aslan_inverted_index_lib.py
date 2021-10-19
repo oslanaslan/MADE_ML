@@ -333,12 +333,7 @@ def test_query_valid_input():
     assert len(set([2]).symmetric_difference(inverted_index.query(['abc', 'c', 'a']))) == 0
 
 
-# main tests
-
-# def test_main_test():
-#     """Test main function"""
-
-#     main()
+# tests
 
 def test_full():
     """Full test"""
@@ -367,4 +362,83 @@ def test_full():
     result = set([])
     assert len(result.symmetric_difference(document_ids)) == 0, (
         "full test 4 failed\n"
+    )
+
+def test_compare_objects():
+    """Tests for InvertedIndex.__eq__() and InvertedIndex.__ne__()"""
+
+    filename = "sample.txt"
+    inverted_index_1 = build_inverted_index(load_documents(filename))
+    inverted_index_2 = build_inverted_index(load_documents(filename))
+
+    with pytest.raises(NotImplementedError):
+        assert inverted_index_1 != {}, (
+            f"inverted_index_1 must not be equal to {dict()}"
+        )
+
+    assert inverted_index_1 == inverted_index_2, (
+        f"inverted_index_1 {inverted_index_1} must be equal to inverted_index_2\
+            {inverted_index_2}\n"
+    )
+
+    assert not (inverted_index_1 != inverted_index_2), (
+        f"inverted_index_1 {inverted_index_1} must not be not equal to inverted_index_2\
+            {inverted_index_2}\n"
+    )
+
+    inverted_index_2.data_["first"].append(13)
+
+    assert inverted_index_1 != inverted_index_2, (
+        f"inverted_index_1 {inverted_index_1} must not be equal to inverted_index_2\
+            {inverted_index_2}\n"
+    )
+
+    assert not (inverted_index_1 == inverted_index_2), (
+        f"inverted_index_1 {inverted_index_1} must be not equal to inverted_index_2\
+            {inverted_index_2}\n"
+    )
+
+    assert inverted_index_1 != inverted_index_2, (
+        f"inverted_index_1 {inverted_index_1} must not be equal to inverted_index_2\
+            {inverted_index_2}\n"
+    )
+
+    inverted_index_2.data_["ggg"] = [4, 5, 6]
+
+    assert not (inverted_index_1 == inverted_index_2), (
+        f"inverted_index_1 {inverted_index_1} must be not equal to inverted_index_2\
+            {inverted_index_2}\n"
+    )
+
+def test_eq_for_inverted_index_objects(tmp_path):
+    """Test for loading from dump"""
+
+    filename = "sample.txt"
+    dump_filename = tmp_path / "dump.index"
+
+    inverted_index = build_inverted_index(load_documents(filename))
+    inverted_index.dump(dump_filename)
+    inverted_index_after_load = InvertedIndex.load(dump_filename)
+
+    assert inverted_index_after_load == inverted_index, (
+        f"InvertedIndex.load(build_inverted_index(load_documents(...)).dump()) must be\
+            same as build_inverted_index(load_documents(...))\n\
+                Got:\n\
+                    - before dump: {inverted_index}\n\
+                        - after load: {inverted_index_after_load}\n"
+    )
+
+def test_repr_and_str():
+    """Test for InvertedIndex.__repr__() and InvertedIndex.__str__()"""
+    filename = "sample.txt"
+    inverted_index = build_inverted_index(load_documents(filename))
+
+    assert isinstance(str(inverted_index), str), (
+        f"InvertedIndex.__str__() must be type of {type(str)}\n\
+            Got: {type(str(inverted_index))}"
+    )
+
+    assert isinstance(inverted_index.__repr__(), str), (
+        f"InvertedIndex.__repr__() must be type of {type(str)}\n\
+            Got: {type(inverted_index.__repr__())}"
     )

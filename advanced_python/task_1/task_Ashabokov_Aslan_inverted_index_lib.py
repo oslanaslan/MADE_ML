@@ -2,6 +2,7 @@
 Inverted Index Creator
 
 Creates Inverted Index dictionary for query searching
+
 """
 
 from __future__ import annotations, absolute_import
@@ -38,6 +39,33 @@ class InvertedIndex:
             inverted_index_dict = {}
         self.dict_check_(inverted_index_dict)
         self.data_ = inverted_index_dict
+
+    def __eq__(self, other: InvertedIndex) -> bool:
+        if not isinstance(other, InvertedIndex):
+            raise NotImplementedError(
+                f"InvertedIndex.__eq__() not implemented for objects type of {type(other)}"
+            )
+
+        if set(self.data_.keys()) != set(other.data_.keys()):
+            return False
+
+        is_eq = True
+
+        for key in self.data_:
+            if set(self.data_[key]) != set(other.data_[key]):
+                is_eq = False
+                break
+
+        return is_eq
+
+    def __ne__(self, other: InvertedIndex) -> bool:
+        return not self.__eq__(other)
+
+    def __repr__(self) -> str:
+        return f"InvertedIndex: {self.data_.__repr__()}"
+
+    def __str__(self) -> str:
+        return self.__repr__()
 
     @classmethod
     def dict_check_(cls, input_dict: dict):
@@ -173,19 +201,3 @@ def build_inverted_index(documents: Dict[int, str]) -> InvertedIndex:
 
     inverted_index = InvertedIndex(inverted_index_dict)
     return inverted_index
-
-
-# def main() -> None:
-#     """Main function"""
-
-#     documents = load_documents("wikipedia_sample")
-#     inverted_index = build_inverted_index(documents)
-#     inverted_index.dump("inverted.index")
-#     inverted_index = InvertedIndex.load("inverted.index")
-#     document_ids = inverted_index.query(["two", "words"])
-
-#     return document_ids
-
-
-# if __name__ == "__main__":
-#     main()
