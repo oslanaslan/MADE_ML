@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """Inverted Index Creator
 
 Creates Inverted Index dictionary for query searching
@@ -7,11 +8,16 @@ Creates Inverted Index dictionary for query searching
 from __future__ import annotations, absolute_import
 
 import os
+import sys
 import json
 import re
 import pickle
 from collections import defaultdict
 from typing import Dict, List
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+
+
+DEFAULT_OUTPUT_FILENAME = "inverted.index"
 
 
 class InvertedIndex:
@@ -122,7 +128,7 @@ class InvertedIndex:
 
         if method == 'json':
             JsonPolicy.dump(self.data_, filepath)
-        elif method == 'binary':
+        elif method == 'pickle':
             PicklePolicy.dump(self.data_, filepath)
         else:
             raise NotImplementedError(f"InvertedIndex.dump: not implemented\
@@ -136,7 +142,7 @@ class InvertedIndex:
 
         if method == 'json':
             inverted_index = JsonPolicy.load(filepath)
-        elif method == 'binary':
+        elif method == 'pickle':
             inverted_index = PicklePolicy.load(filepath)
         else:
             raise NotImplementedError(f"InvertedIndex.load: not implemented\
@@ -253,12 +259,87 @@ class PicklePolicy(StoragePolicy):
 
         return InvertedIndex(data_dict)
 
+def setup_parser() -> ArgumentParser:
+    parser = ArgumentParser(
+        prog="inverted_index",
+        description="Inverted Index CLI: lib for loading, storing and processing inverted index mappings",
+        formatter_class=ArgumentDefaultsHelpFormatter,
+        add_help=True,
+        argument_default="-h",
+    )
+    subparsers = parser.add_subparsers(
+        title="sommands",
+        dest="command",
+        required=True,
+    )
+    subparsers.required = True
+
+    build_parser = subparsers.add_parser(
+        "build",
+        help="Inverted Index CLI: build: build inverted index",
+    )
+    build_parser.add_argument(
+        "--strategy",
+        help="dump strategy: dump to json or dump to pickle (default: json)",
+        choices=["json", "pickle"],
+        default="json",
+    )
+    build_parser.add_argument(
+        "--dataset",
+        help="path to dataset",
+        dest="dataset_filename",
+        required=True,
+    )
+    build_parser.add_argument(
+        "--output",
+        help="output file name (default: inverted.index)",
+        default=DEFAULT_OUTPUT_FILENAME,
+        dest="output_filename"
+    )
+
+    query_parser = subparsers.add_parser(
+        "query",
+        help="Inverted Index CLI: query: search for query result in inverted index",
+    )
+    query_parser.add_argument(
+        "--json-index",
+        help="Load Inverted Index CLI from json",
+        dest="json_filename",
+    )
+    query_parser.add_argument(
+        "--pickle-index",
+        help="Load Inverted Index CLI from pickle",
+        dest="pickle_filename",
+    )
+    query_parser.add_argument(
+        "--query",
+        action='append',
+        required=True,
+        nargs='+',
+        dest="word",
+    )
+
+    return parser
+
+def parse_arguments(parser: ArgumentParser) -> list:
+    try:
+        args = parser.parse_args()
+    except:
+        # parser.print_help(sys.stderr)
+        sys.exit(0)
+
+    return args
 
 def main():
-    documents = load_documents("/path/to/dataset")
-    inverted_index = build_inverted_index(documents)
-    inverted_index.dump("/path/to/inverted.index")
-    inverted_index = InvertedIndex.load("/path/to/inverted.index")
+    parser = setup_parser()
+    args = parse_arguments(parser)
+    
+    if args.command == "build":
+        documents = load_documents(args.dataset_filename)
+        inverted_index = build_inverted_index(documents)
+        inverted_index.dump(args.output_filename, method=args.strategy)
+    elif args.command == "query":
+        inverted_index = InvertedIndex.load(args.)
     document_ids = inverted_index.query(["two", "words"])
     print(document_ids)
 

@@ -8,6 +8,7 @@ import json
 from os import pipe
 import pytest
 import pickle
+from argparse import Namespace
 
 from task_Ashabokov_Aslan_inverted_index_lib import InvertedIndex
 from task_Ashabokov_Aslan_inverted_index_lib import load_documents
@@ -228,7 +229,7 @@ def test_dump_valid_data_to_pickle(tmp_path):
     }
     valid_dict = defaultdict(list, valid_dict)
     inverted_index = InvertedIndex(valid_dict)
-    inverted_index.dump(file_path, method='binary')
+    inverted_index.dump(file_path, method='pickle')
 
     with open(file_path, 'rb') as file:
         dumped_data = pickle.load(file)
@@ -302,7 +303,7 @@ def test_load_read_invalid_dict_from_pickle(tmp_path):
         pickle.dump(invalid_dict, file)
 
     with pytest.raises(Exception):
-        InvertedIndex.load(invalid_data_path, method='binary')
+        InvertedIndex.load(invalid_data_path, method='pickle')
 
 
 def test_load_result_type_from_json(tmp_path):
@@ -340,7 +341,7 @@ def test_load_result_type_from_pickle(tmp_path):
     with open(valid_data_path, 'wb') as file:
         pickle.dump(valid_data, file)
 
-    result = InvertedIndex.load(valid_data_path, method='binary')
+    result = InvertedIndex.load(valid_data_path, method='pickle')
 
     assert isinstance(result, InvertedIndex), (
         f"Result must be type of InvertedIndex\nGot: {type(result)}\n"
@@ -598,3 +599,8 @@ def test_pickle_policy_load(tmp_path):
     assert inverted_index.data_ == valid_dict, (
         f"Valid data: {valid_dict}\nGot: {inverted_index}\n"
     )
+
+# Arguments parsing tests
+
+def test_setup_parser():
+    
