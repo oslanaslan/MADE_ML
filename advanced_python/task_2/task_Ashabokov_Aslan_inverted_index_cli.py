@@ -1,8 +1,84 @@
 #!/usr/bin/env python
-"""Inverted Index Creator
+"""Inverted Index CLI
 
-Creates Inverted Index dictionary for query searching
+Inverted Index CLI: lib for loading, storing and processing inverted index
+mappings
 
+
+Classes
+-------
+- InvertedIndex         - Class for creating, dumping, loading inverted indices.
+                            Also can find document indices in inverted index using query.
+- load_documents        - Function for loading and preprocessing data from dataset.
+- build_inverted_index  - Function for creating inverted index based on preprocessed data.
+- StoragePolicy         - Abstract class for creating dump strategy policies.
+- JsonPolicy            - Class based on StrategyPolicy for saving inverted index
+                            in json on disk.
+- PicklePolicy          - Class based on StrategyPolicy for saving inverted index
+                            in binary format on disk.
+- setup_parser          - Function for creating parser with command line arguments.
+- parse_arguments       - Function for parsing command line arguments.
+- main                  - Function for running module as command line script.
+
+
+Usage (inverted-index)
+----------------------
+optional arguments:
+  -h, --help     show this help message and exit
+
+commands:
+  {build,query}
+    build        Inverted Index CLI: build: build inverted index
+    query        Inverted Index CLI: query: search for query result in
+                 inverted index
+
+
+Usage (inverted-index build)
+----------------------------
+inverted_index build [-h] [--strategy {json,pickle}] --dataset
+                            DATASET_FILENAME [--output OUTPUT_FILENAME]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --strategy {json,pickle}
+                        dump strategy: dump to json or dump to pickle
+                        (default: json)
+  --dataset DATASET_FILENAME
+                        path to dataset
+  --output OUTPUT_FILENAME
+                        output file name (default: inverted.index)
+
+
+Usage (inverted-index query)
+----------------------------
+inverted_index query [-h] [--json-index JSON_FILENAME]
+                            [--pickle-index PICKLE_FILENAME] --query QUERIES
+                            [QUERIES ...]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --json-index JSON_FILENAME
+                        Load Inverted Index CLI from json
+  --pickle-index PICKLE_FILENAME
+                        Load Inverted Index CLI from pickle
+  --query QUERIES [QUERIES ...]
+
+
+Usage Examples
+--------------
+$ ./inverted-index.py --help
+
+$ ./inverted-index.py build --strategy json --dataset
+/path/to/dataset --output /path/to/inverted.index
+
+$ ./inverted-index.py build --strategy pickle
+--dataset /path/to/dataset --output /path/to/inverted.index
+
+$ ./inverted-index.py build --dataset /path/to/dataset
+--output /path/to/inverted.index
+
+$ ./inverted-index.py query --json-index /path/to/inverted.index
+--query first query --query xxx --query the second query
 """
 
 from __future__ import annotations, absolute_import
@@ -41,11 +117,15 @@ class InvertedIndex:
     """
 
     def __init__(self, inverted_index_dict: Dict[int, str] = None) -> None:
+        """Create inverted index from dict (based on defaultdict)"""
+
         inverted_index_dict = inverted_index_dict or dict()
         self.dict_check(inverted_index_dict)
         self.data_ = defaultdict(list, inverted_index_dict)
 
     def __eq__(self, other: InvertedIndex) -> bool:
+        """Compares two InvertedIndex objects (true if they are equal)"""
+
         if not isinstance(other, InvertedIndex):
             raise NotImplementedError(
                 f"InvertedIndex.__eq__() not implemented for objects type of {type(other)}"
@@ -64,12 +144,18 @@ class InvertedIndex:
         return is_eq
 
     def __ne__(self, other: InvertedIndex) -> bool:
+        """Compares two InvertedIndex objects (true if they are not equal)"""
+
         return not self.__eq__(other)
 
     def __repr__(self) -> str:
+        """For printing InvertedIndex objects"""
+
         return f"InvertedIndex: {self.data_.__repr__()}"
 
     def __str__(self) -> str:
+        """For converting InvertedIndex objects to string"""
+
         return self.__repr__()
 
     @staticmethod
@@ -203,18 +289,36 @@ def build_inverted_index(documents: Dict[int, str]) -> InvertedIndex:
 
 
 class StoragePolicy:
+    """Abstract Class for describing saving strategy policies.
+
+    Abstract Functions
+    ------------------
+    - dump  - dumps inverted index data on disk.
+    - load  - loads inverted index data from disk.
+    """
+
     @staticmethod
     def dump(word_to_docs_mapping: dict, filepath: str):
-        pass
+        """Abstract function for saving inverted index data on disk"""
 
     @staticmethod
     def load(filepath: str):
-        pass
+        """Abstract function for loading data from disk"""
 
 
 class JsonPolicy(StoragePolicy):
+    """Class for saving inverted index data on disk in json format.
+
+    Functions
+    ---------
+    - dump  - dumps inverted index data on disk in json format.
+    - load  - loads inverted index data from disk in json format.
+    """
+
     @staticmethod
     def dump(word_to_docs_mapping: dict, filepath: str):
+        """Save inverted index data on disk in json format"""
+
         dirname = os.path.dirname(filepath)
 
         if not os.path.isdir(dirname) and not dirname == '':
@@ -227,6 +331,8 @@ class JsonPolicy(StoragePolicy):
 
     @staticmethod
     def load(filepath: str):
+        """Load inverted index data from disk in json format"""
+
         if not os.path.exists(filepath):
             raise FileNotFoundError(f"File {filepath} doesn't exist\n")
 
@@ -237,8 +343,17 @@ class JsonPolicy(StoragePolicy):
 
 
 class PicklePolicy(StoragePolicy):
+    """Class for saving inverted index data on disk in binary format.
+
+    Functions
+    ---------
+    - dump  - dumps inverted index data on disk in binary format.
+    - load  - loads inverted index data from disk in binary format.
+    """
+
     @staticmethod
     def dump(word_to_docs_mapping: dict, filepath: str):
+        """Save inverted index data on disk in binary format"""
         dirname = os.path.dirname(filepath)
 
         if not os.path.isdir(dirname) and not dirname == '':
@@ -249,8 +364,10 @@ class PicklePolicy(StoragePolicy):
         with open(filepath, 'wb') as file:
             pickle.dump(word_to_docs_mapping, file)
 
-    @staticmethod
-    def load(filepath: str):
+    @classmethod
+    def load(cls, filepath: str):
+        """Load inverted index data from disk in binary format"""
+
         if not os.path.exists(filepath):
             raise FileNotFoundError(f"Dirpath {filepath} doesn't exist\n")
 
@@ -259,24 +376,30 @@ class PicklePolicy(StoragePolicy):
 
         return InvertedIndex(data_dict)
 
+
 def setup_parser() -> ArgumentParser:
+    """Create and setup command line arguments parser"""
+
     parser = ArgumentParser(
         prog="inverted_index",
-        description="Inverted Index CLI: lib for loading, storing and processing inverted index mappings",
+        description="Inverted Index CLI: lib for loading, \
+            storing and processing inverted index mappings",
         formatter_class=ArgumentDefaultsHelpFormatter,
         add_help=True,
         argument_default="-h",
     )
     subparsers = parser.add_subparsers(
-        title="sommands",
+        title="commands",
         dest="command",
         required=True,
+        description="Inverted Index CLI",
     )
     subparsers.required = True
 
     build_parser = subparsers.add_parser(
         "build",
         help="Inverted Index CLI: build: build inverted index",
+        description="Inverted Index CLI: build: build inverted index",
     )
     build_parser.add_argument(
         "--strategy",
@@ -300,6 +423,7 @@ def setup_parser() -> ArgumentParser:
     query_parser = subparsers.add_parser(
         "query",
         help="Inverted Index CLI: query: search for query result in inverted index",
+        description="Inverted Index CLI: query: search for query result in inverted index",
     )
     query_parser.add_argument(
         "--json-index",
@@ -310,6 +434,7 @@ def setup_parser() -> ArgumentParser:
         "--pickle-index",
         help="Load Inverted Index CLI from pickle",
         dest="pickle_filename",
+        default="",
     )
     query_parser.add_argument(
         "--query",
@@ -322,26 +447,37 @@ def setup_parser() -> ArgumentParser:
     return parser
 
 def parse_arguments(parser: ArgumentParser) -> list:
-    try:
-        args = parser.parse_args()
-    except:
-        # parser.print_help(sys.stderr)
-        sys.exit(0)
+    """Parse arguments with created parser"""
+
+    args = parser.parse_args()
 
     return args
 
 def main():
+    """Function for acting as a command line script"""
+
     parser = setup_parser()
     args = parse_arguments(parser)
-    
+
     if args.command == "build":
         documents = load_documents(args.dataset_filename)
         inverted_index = build_inverted_index(documents)
         inverted_index.dump(args.output_filename, method=args.strategy)
     elif args.command == "query":
-        inverted_index = InvertedIndex.load(args.)
-    document_ids = inverted_index.query(["two", "words"])
-    print(document_ids)
+        if args.json_filename:
+            inverted_index = InvertedIndex.load(args.json_filename, method='json')
+        elif args.pickle_filename:
+            inverted_index = InvertedIndex.load(args.pickle_filename, method='pickle')
+        else:
+            print("Inverted Index CLI: query: --json-index or \
+                --pickle-index required", file=sys.stderr)
+            parser.print_help(sys.stderr)
+            sys.exit(1)
+
+        for query in args.word:
+            document_ids = inverted_index.query(query)
+            document_ids = [str(ind) for ind in document_ids]
+            print(','.join(document_ids), file=sys.stdout)
 
 
 if __name__ == "__main__":

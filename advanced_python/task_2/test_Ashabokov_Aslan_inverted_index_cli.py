@@ -10,12 +10,12 @@ import pytest
 import pickle
 from argparse import Namespace
 
-from task_Ashabokov_Aslan_inverted_index_lib import InvertedIndex
-from task_Ashabokov_Aslan_inverted_index_lib import load_documents
-from task_Ashabokov_Aslan_inverted_index_lib import build_inverted_index
-from task_Ashabokov_Aslan_inverted_index_lib import StoragePolicy
-from task_Ashabokov_Aslan_inverted_index_lib import JsonPolicy
-from task_Ashabokov_Aslan_inverted_index_lib import PicklePolicy
+from task_Ashabokov_Aslan_inverted_index_cli import InvertedIndex
+from task_Ashabokov_Aslan_inverted_index_cli import load_documents
+from task_Ashabokov_Aslan_inverted_index_cli import build_inverted_index
+from task_Ashabokov_Aslan_inverted_index_cli import StoragePolicy
+from task_Ashabokov_Aslan_inverted_index_cli import JsonPolicy
+from task_Ashabokov_Aslan_inverted_index_cli import PicklePolicy
 
 # toad_documents tests
 
@@ -603,4 +603,4 @@ def test_pickle_policy_load(tmp_path):
 # Arguments parsing tests
 
 def test_setup_parser():
-    
+    pass
