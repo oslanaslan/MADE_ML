@@ -1,3 +1,0 @@
-5	first text line
-7	second text line
-78	something else
