@@ -2,11 +2,13 @@
 '''
 Asset Web Service
 '''
-from argparse import ArgumentParser
+from argparse import ArgumentParser, FileType
 import sys
 import logging
 import logging.config
 from typing import Dict
+import json
+from collections import defaultdict
 
 import requests
 import yaml
@@ -28,7 +30,7 @@ API_GET_ASSET = "/api/asset/get"
 API_CALCULATE_REVENUE = "/api/asset/calculate_revenue"
 API_CLEANUP = "/api/asset/cleanup"
 
-REPORT_TAGS = ['USD', 'EUR', 'Au', 'Ag', 'Pt', 'Pd']
+REPORT_TAGS = ['RUB', 'USD', 'EUR', 'Au', 'Ag', 'Pt', 'Pd']
 API_503_MESSAGE = "CBR service is unavailable"
 API_404_MESSAGE = "This route is not found"
 
@@ -100,7 +102,7 @@ class Profile:
 
     def __repr__(self) -> str:
         '''Magic repr'''
-        return self.asset.__repr__() + f' char_code: {self._char_code}'
+        return self.asset.__repr__() + f' char_code: {self.char_code}'
 
 # Parsers
 
@@ -110,8 +112,6 @@ def convert_to_float(text: str) -> float:
         text = ''.join(text.split(' '))
     if ',' in text:
         text = ''.join(text.split(','))
-    if '`' in text:
-        text = ''.join(text.split('`'))
     res = float(text)
 
     return res
@@ -145,12 +145,23 @@ def parse_cbr_key_indicators(html_data: str) -> Dict[str,float]:
     '''
     char_codes = {}
     parser = BeautifulSoup(html_data, "html.parser")
-    tags = parser.findAll("td")
+    tags = parser.findAll('div', {'class': 'key-indicator_table_wrapper'})
+    currency_tags = tags[1].findAll('tr')[1:]
+    active_tags = tags[2].findAll('tr')[1:]
 
-    for num, tag in enumerate(tags):
-        for word in REPORT_TAGS:
-            if word in tag.text:
-                char_codes[word] = convert_to_float(tags[num + 1].text)
+    for tag in currency_tags:
+        subtags = tag.findAll('td')
+        code = subtags[0].findAll('div', {'class': 'col-md-3 offset-md-1 _subinfo'})
+        code = code[0].text
+        value = subtags[2].text
+        char_codes[code] = convert_to_float(value)
+
+    for tag in active_tags:
+        tag_lst = tag.text.strip('\n').split('\n')
+        tag_lst = [i for i in tag_lst if len(i) > 0]
+        code = tag_lst[1]
+        value = tag_lst[-1]
+        char_codes[code] = convert_to_float(value)
 
     return char_codes
 
@@ -270,13 +281,40 @@ def get_asset_callback():
 def calculate_revenue_callback():
     '''Calculate revenue with given periods'''
     query = request.args.getlist('period')
-    all_revenue = []
+    cbr_daily_rates = cbr_daily_callback().get_data()
+    cbr_daily_rates = json.loads(cbr_daily_rates)
+    cbr_indicators = cbr_indicators_callback().get_data()
+    cbr_indicators = json.loads(cbr_indicators)
+    all_revenue = defaultdict(lambda: 0)
 
     for period in query:
-        # TODO
-        pass
+        current_revenue = 0
 
-    return make_response("OK", 200)
+        for profile in app.bank:
+            current_char_code = profile.char_code
+            current_asset = profile.asset
+
+            if current_char_code != "RUB":
+                if current_char_code in cbr_indicators:
+                    current_capital = current_asset.capital * \
+                        cbr_indicators[current_char_code]
+                else:
+                    current_capital = current_asset.capital * \
+                        cbr_daily_rates[current_char_code]
+
+                current_asset = Asset(
+                    name=current_asset.name,
+                    capital=current_capital,
+                    interest=current_asset.interest,
+                )
+
+            current_revenue += current_asset.calculate_revenue(float(period))
+
+        all_revenue[period] += current_revenue
+
+    response = jsonify(all_revenue)
+
+    return response
 
 @app.route(API_CLEANUP)
 def cleanup_callback():

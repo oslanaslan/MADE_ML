@@ -1,21 +1,21 @@
-from pdb import set_trace
-from flask import cli
-
-import requests
-from requests import exceptions
-from requests.api import request
-from werkzeug.wrappers import response
-import pytest
+'''
+Test task_Ashabokov_Aslan_asset_web_service module
+'''
 from unittest import mock
-from argparse import Namespace
+from argparse import ArgumentParser, Namespace
 import json
 
-from task_Ashabokov_Aslan_asset_web_service import Asset, app
+import requests
+import pytest
+
 from task_Ashabokov_Aslan_asset_web_service import (
+    Asset,
+    app,
+    load_asset_from_file,
+    print_asset_revenue,
+    setup_parser,
     parse_cbr_currency_base_daily,
     parse_cbr_key_indicators,
-    CBR_DAILY_URL,
-    CBR_KEY_INDICATORS_URL,
     API_CBR_DAILY,
     API_CBR_KEY_INDICATORS,
     API_503_MESSAGE,
@@ -30,6 +30,7 @@ from task_Ashabokov_Aslan_asset_web_service import (
 # Parser tests
 
 EPS = 10e-8
+TEST_ASSET_FILE = "test_asset.txt"
 CBR_DAILY_HTML = "cbr_currency_base_daily.html"
 CBR_KEY_INDICATORS_HTML = "cbr_key_indicators.html"
 API_UNKNOWN_ROUTE = "abc/gg/wp"
@@ -40,54 +41,30 @@ def test_parse_cbr_currency_base_daily():
         html_dump = fin.read()
 
     result_dict = parse_cbr_currency_base_daily(html_dump)
-    AUD_rate = result_dict['AUD']
-    AMD_rate = result_dict['AMD']
+    aud_rate = result_dict['AUD']
+    amd_rate = result_dict['AMD']
 
-    assert 34 == len(result_dict), (
+    assert len(result_dict) == 34, (
         f'result_dict should contain 35 items.\nGot: {len(result_dict)}'
     )
-    assert abs(AUD_rate - 57.0229) < EPS, (
-        f"AUD value should be: 57.0229.\nGot: {AUD_rate}"
+    assert abs(aud_rate - 57.0229) < EPS, (
+        f"AUD value should be: 57.0229.\nGot: {aud_rate}"
     )
-    assert abs(AMD_rate - 14.4485 / 100) < EPS, (
-        f"AMD value should be: {14.4485 / 100}.\nGot: {AMD_rate}"
+    assert abs(amd_rate - 14.4485 / 100) < EPS, (
+        f"AMD value should be: {14.4485 / 100}.\nGot: {amd_rate}"
     )
 
-def test_parse_parse_cbr_key_indicators():
+def test_parse_cbr_key_indicators():
     '''Test parse_cbr_key_indicators'''
     with open(CBR_KEY_INDICATORS_HTML) as fin:
         html_dump = fin.read()
 
     result_dict = parse_cbr_key_indicators(html_dump)
-    USD_rate = result_dict['USD']
-    EUR_rate = result_dict['EUR']
-    AU_rate = result_dict['Au']
-    AG_rate = result_dict['Ag']
-    PT_rate = result_dict['Pt']
-    PD_rate = result_dict['Pd']
 
     for tag in result_dict:
         assert isinstance(result_dict[tag], float), (
             f"Value should type of float.\nGot: {type(result_dict[tag])}"
         )
-    assert abs(USD_rate - 75.3498) < EPS, (
-        f"USD should be: 75.3498.\nGot: {USD_rate}"
-    )
-    assert abs(EUR_rate - 92.0699) < EPS, (
-        f"EUR should be: 92.0699.\nGot: {EUR_rate}"
-    )
-    assert abs(AU_rate - 4529.59) < EPS, (
-        f"Au should be: 4529.59.\nGot: {AU_rate}"
-    )
-    assert abs(AG_rate - 62.52) < EPS, (
-        f"Ag should be: 62.52.\nGot: {AG_rate}"
-    )
-    assert abs(PT_rate - 2459.96) < EPS, (
-        f"Pt should be: 2459.96.\nGot: {PT_rate}"
-    )
-    assert abs(PD_rate - 5667.14) < EPS, (
-        f"Pd should be: 5667.14.\nGot: {PD_rate}"
-    )
 
 # API tests
 
@@ -108,27 +85,28 @@ def test_local_cbr_daily_callback(mock_get, client):
     response.ok = True
     mock_get.return_value = response
     client_response = client.get(API_CBR_DAILY)
-    
-    assert 200 == client_response.status_code, (
+
+    assert client_response.status_code == 200, (
         f"Status code should be 200.\nGot: {client_response.status_code}"
     )
-    AMD_rate = json.loads(client_response.data)['AMD']
-    assert abs(0.144485 - AMD_rate) < EPS, (
-        f"AMD rate should be: 0.144485.\nGot: {AMD_rate}"
+    amd_rate = json.loads(client_response.data)['AMD']
+    current_amd_rate = 0.144485
+    assert abs(current_amd_rate - amd_rate) < EPS, (
+        f"AMD rate should be: 0.144485.\nGot: {amd_rate}"
     )
 
 def test_cbr_daily_callback(client):
     '''Test cbr_daily_callback with real request'''
     response = client.get(API_CBR_DAILY)
 
-    assert 200 == response.status_code, (
+    assert response.status_code == 200, (
         f"Status code should be 200.\nGot: {response.status_code}"
     )
-    assert "application/json" == response.content_type, (
+    assert response.content_type == "application/json", (
         f"Content type should be application/json.\nGot: {response.content_type}"
     )
     assert response.is_json, (
-        f"Response should be json."
+        "Response should be json."
     )
 
 @mock.patch("requests.get")
@@ -143,7 +121,7 @@ def test_local_cbr_indicators_callback(mock_get, client):
     mock_get.return_value = response
     client_response = client.get(API_CBR_KEY_INDICATORS)
 
-    assert 200 == client_response.status_code, (
+    assert client_response.status_code == 200, (
         f"Status code should be 200.\nGot: {client_response.status_code}"
     )
 
@@ -151,24 +129,21 @@ def test_cbr_indicators_callback(client):
     '''Test cbr_indicators_callback with real request'''
     response = client.get(API_CBR_KEY_INDICATORS)
 
-    assert 200 == response.status_code, (
+    assert response.status_code == 200, (
         f"Status code should be 200.\nGot: {response.status_code}"
     )
-    assert "application/json" == response.content_type, (
+    assert response.content_type == "application/json", (
         f"Content type should be application/json.\nGot: {response.content_type}"
     )
 
 def test_page_not_found(client):
     '''Test 404 error'''
     response = client.get(API_UNKNOWN_ROUTE)
-
-    # from pdb import set_trace; set_trace();
-
-    assert 404 == response.status_code, (
+    assert response.status_code == 404, (
         f"Status code should be 404.\nGot: {response.status_code}"
     )
     assert not response.is_json, (
-        f"Error response should not be json."
+        "Error response should not be json."
     )
     assert API_404_MESSAGE in response.get_data().decode(), (
         f"Text should be: {API_404_MESSAGE}.\nGot: {response.get_data().decode()}"
@@ -181,33 +156,36 @@ def test_page_is_not_accessable(mock_get, client):
     def lambda_function(x):
         raise requests.exceptions.ConnectionError()
 
-    TRUE_STATUS_CODE = 503
+    true_state_code = 503
     mock_get.side_effect = lambda_function
-
-    # from pdb import set_trace; set_trace();
-
     response = client.get(API_CBR_DAILY)
 
-    assert TRUE_STATUS_CODE == response.status_code, (
-        f"Status code should be {TRUE_STATUS_CODE}.\nGot: {response.status_code}"
+    assert response.status_code == true_state_code, (
+        f"Status code should be {true_state_code}.\nGot: {response.status_code}"
     )
     assert API_503_MESSAGE == response.get_data().decode(), (
         f"Response message should be: {API_503_MESSAGE}.\nGot: {response.get_data().decode()}"
     )
 
-def create_test_asset_url(name: str) -> str:
+def create_test_asset_url(
+        name: str = None,
+        char_code: str = None,
+        capital: float = None,
+        interest: float = None
+    ) -> str:
     '''Create URL for adding test asset'''
-    char_code = 'USD'
-    capital = 1
-    interest = 0.5
+    name = name or "MyAsset"
+    char_code = char_code or'USD'
+    capital = capital or 1
+    interest = interest or 0.5
     request_url = f"/api/asset/add/{char_code}/{name}/{capital}/{interest}"
 
     return request_url
 
 def create_test_asset_get_url(
-    name_1: str = None,
-    name_2: str = None,
-):
+        name_1: str = None,
+        name_2: str = None,
+    ):
     '''Help function for testing get asset callback'''
     name_1 = name_1 or "MyAsset1"
     name_2 = name_2 or "MyAsset2"
@@ -215,14 +193,16 @@ def create_test_asset_get_url(
 
     return request_url
 
-def create_test_revenue_request_url(
-    period_1: str = None,
-    period_2: str = None,
-):
+def create_test_revenue_request_url(periods: str = None):
     '''Help function for create calculate_revenue request'''
-    period_1 = period_1 or 5
-    period_2 = period_2 or 10
-    request_url = API_CALCULATE_REVENUE + f"?period={period_1}&period={period_2}"
+    periods = periods or [5, 10]
+    request_url = API_CALCULATE_REVENUE + "?"
+
+    for period in periods:
+        request_url += f"period={period}&"
+
+    if len(periods) != 0:
+        request_url = request_url[:-1]
 
     return request_url
 
@@ -239,7 +219,7 @@ def test_create_asset_callback(client):
         f"Status code should be: {status_code}.\nGot: {response.status_code}"
     )
     assert not response.is_json, (
-        f"Response should be text."
+        "Response should be text."
     )
     response_text = response.get_data().decode()
     target_text = msg.format(name)
@@ -255,7 +235,7 @@ def test_create_asset_callback(client):
         f"Status code should be: {status_code}.\nGot: {response.status_code}"
     )
     assert not response.is_json, (
-        f"Response should be text."
+        "Response should be text."
     )
     response_text = response.get_data().decode()
     target_text = msg.format(name)
@@ -271,16 +251,16 @@ def test_get_asset_list_callback(client):
     add_asset_2_url = create_test_asset_url(second_asset_name)
     response = client.get(add_asset_2_url)
 
-    assert 200 == response.status_code, (
+    assert response.status_code == 200, (
         "Status code must be 200."
     )
     response = client.get(add_asset_1_url)
-    assert 200 == response.status_code, (
+    assert response.status_code == 200, (
         "Status code must be 200."
     )
     response = client.get(API_ASSET_LIST)
 
-    assert 200 == response.status_code, (
+    assert response.status_code == 200, (
         "Status code must be 200."
     )
     assert response.is_json, (
@@ -289,7 +269,7 @@ def test_get_asset_list_callback(client):
 
     res_lst = json.loads(response.get_data())
 
-    assert 3 == len(res_lst), (
+    assert len(res_lst) == 3, (
         f"Response len must be 2.\nGot: {len(res_lst)}"
     )
     assert first_asset_name == res_lst[1][1], (
@@ -303,26 +283,17 @@ def test_get_asset_callback(client):
 
     # from pdb import set_trace; set_trace();
 
-    assert 200 == response.status_code, (
+    assert response.status_code == 200, (
         "Status code must be 200."
     )
 
     res_lst = json.loads(response.get_data())
 
-    assert 2 == len(res_lst), (
+    assert len(res_lst) == 2, (
         f"Response len must be 2.\nGot: {len(res_lst)}"
     )
-    assert "MyAsset2" == res_lst[1][1], (
+    assert res_lst[1][1] == "MyAsset2", (
         f"Asset MyAsset2 must be first.\nGot: {res_lst}"
-    )
-
-def test_calculate_revenue_callback(client):
-    '''Test calculate_revenue_callback'''
-    request_url = create_test_revenue_request_url()
-    response = client.get(request_url)
-
-    assert 200 == response.status_code, (
-        f"Response status code must be 200.\nGot: {response.status_code}"
     )
 
 def test_cleanup_callback(client):
@@ -331,7 +302,7 @@ def test_cleanup_callback(client):
     true_msg = "there are no more assets"
     response_msg = response.get_data().decode()
 
-    assert 200 == response.status_code, (
+    assert response.status_code == 200, (
         f"Status code must be 200.\nGot: {response.status_code}"
     )
     assert true_msg == response_msg, (
@@ -340,10 +311,150 @@ def test_cleanup_callback(client):
 
     response = client.get(API_ASSET_LIST)
 
-    assert 200 == response.status_code, (
+    assert response.status_code == 200, (
         f"Status code must be 200.\nGot: {response.status_code}"
     )
     res_lst = json.loads(response.get_data().decode())
-    assert 0 == len(res_lst), (
+    assert len(res_lst) == 0, (
         f"Must return empty list.\nGot: {res_lst}"
     )
+
+def test_calculate_revenue_callback(client):
+    '''Test calculate_revenue_callback'''
+    revenue_request_url = create_test_revenue_request_url(
+        [1]
+    )
+    add_first_asset_url = create_test_asset_url(
+        name="T1",
+        char_code="RUB",
+        capital=100,
+        interest=0.1,
+    )
+    add_second_asset_url = create_test_asset_url(
+        name="T2",
+        char_code="RUB",
+        capital=100,
+        interest=0.1,
+    )
+
+    response = client.get(add_first_asset_url)
+
+    assert response.status_code == 200, (
+        f"Status code must be 200,\nGot: {response.status_code}"
+    )
+
+    response = client.get(add_second_asset_url)
+
+    assert response.status_code == 200, (
+        f"Status code must be 200,\nGot: {response.status_code}"
+    )
+
+    response = client.get(revenue_request_url)
+
+    assert response.status_code == 200, (
+        f"Response status code must be 200.\nGot: {response.status_code}"
+    )
+
+    res_dict = json.loads(response.get_data())
+    expected_revenue = 20.000000000000018
+
+    assert abs(res_dict["1"] - expected_revenue) < EPS, (
+        f"Expected revenue: {expected_revenue}.\nGot: {res_dict['1']}"
+    )
+
+    add_asset_url = create_test_asset_url(
+        name="T3",
+        char_code="USD",
+        capital=100,
+        interest=0.1,
+    )
+    response = client.get(add_asset_url)
+
+    assert response.status_code == 200, (
+        f"Response status code must be 200.\nGot: {response.status_code}"
+    )
+
+    add_asset_url = create_test_asset_url(
+        name="T4",
+        char_code="AMD",
+        capital=10,
+        interest=0.1,
+    )
+    response = client.get(add_asset_url)
+
+    assert response.status_code == 200, (
+        f"Response status code must be 200.\nGot: {response.status_code}"
+    )
+
+    add_asset_url = create_test_asset_url(
+        name="T5",
+        char_code="Au",
+        capital=50,
+        interest=0.1,
+    )
+    response = client.get(add_asset_url)
+
+    assert response.status_code == 200, (
+        f"Response status code must be 200.\nGot: {response.status_code}"
+    )
+
+    revenue_request_url = create_test_revenue_request_url([1, 2])
+    response = client.get(revenue_request_url)
+
+    assert response.status_code == 200, (
+        f"Response status code must be 200.\nGot: {response.status_code}"
+    )
+
+    res_dict = json.loads(response.get_data())
+    expected_revenue = 21805.34615400002
+
+    assert abs(res_dict["1"] - expected_revenue) < EPS, (
+        f"Expected revenue: {expected_revenue}.\nGot: {res_dict['1']}"
+    )
+
+    expected_revenue = 45791.22692340005
+
+    assert abs(res_dict["2"] - expected_revenue) < EPS, (
+        f"Expected revenue: {expected_revenue}.\nGot: {res_dict['2']}"
+    )
+
+# Test Asset class
+
+def test_build_from_str():
+    '''Test build from str'''
+    asset_str = "MyAsset 1 0.1"
+    asset_1 = Asset.build_from_str(asset_str)
+    asset_2 = Asset(
+        name="MyAsset",
+        capital=1,
+        interest=0.1
+    )
+    with open(TEST_ASSET_FILE) as fin:
+        asset_3 = load_asset_from_file(fin)
+
+    assert asset_1 == asset_2, (
+        f"Asset {str(asset_1)} must be equal to {str(asset_2)}"
+    )
+    assert asset_1 == asset_3, (
+        f"Asset {str(asset_1)} must be equal to {str(asset_3)}"
+    )
+
+def test_setup_parser():
+    '''Test setup parser'''
+
+    parser = ArgumentParser(
+        prog="asset",
+        description="tool to forecast asset revenue",
+    )
+    setup_parser(parser)
+
+    assert isinstance(parser, ArgumentParser), (
+        f"Parser must be type of {type(ArgumentParser)}"
+    )
+
+@mock.patch("task_Ashabokov_Aslan_asset_web_service.print")
+def test_print_asset_revenue(mock_print):
+    '''Test print_asset_revenue'''
+    mock_print.return_value = None
+    with open(TEST_ASSET_FILE) as fin:
+        print_asset_revenue(fin, list(range(1, 10)))
