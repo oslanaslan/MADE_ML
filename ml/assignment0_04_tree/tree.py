@@ -19,8 +19,21 @@ def entropy(y):
     EPS = 0.0005
 
     # YOUR CODE HERE
+    # from pdb import set_trace; set_trace()
     
-    return 0.
+    if y.shape[0] == 0:
+        return 0.
+    
+    p_lst = np.sum(y, axis=0) / y.shape[0] + EPS
+    
+    assert p_lst.shape[0] == y.shape[1]
+    
+    res = -np.sum(p_lst * np.log(p_lst))
+    
+    # if np.isnan(res):
+    #     from pdb import set_trace; set_trace()
+    
+    return res
     
 def gini(y):
     """
@@ -38,8 +51,16 @@ def gini(y):
     """
 
     # YOUR CODE HERE
+    # from pdb import set_trace; set_trace()
+    if y.shape[0] == 0:
+        return 0
+    p_lst = np.sum(y, axis=0) / y.shape[0]
     
-    return 0.
+    assert p_lst.shape[0] == y.shape[1]
+    
+    res = 1. - np.sum(p_lst ** 2)
+    
+    return res
     
 def variance(y):
     """
@@ -57,8 +78,9 @@ def variance(y):
     """
     
     # YOUR CODE HERE
+    res = np.sum((y - np.mean(y)) ** 2) / y.shape[0]
     
-    return 0.
+    return res
 
 def mad_median(y):
     """
@@ -77,6 +99,7 @@ def mad_median(y):
     """
 
     # YOUR CODE HERE
+    np.sum(np.abs(y - np.median(y))) / y.shape[0]
     
     return 0.
 
@@ -99,6 +122,8 @@ class Node:
         self.feature_index = feature_index
         self.value = threshold
         self.proba = proba
+        self.is_leaf = False
+        self.label = None
         self.left_child = None
         self.right_child = None
         
@@ -124,6 +149,7 @@ class DecisionTree(BaseEstimator):
         self.depth = 0
         self.root = None # Use the Node class to initialize it later
         self.debug = debug
+        self.EPS = 0.0005
 
         
         
@@ -155,6 +181,13 @@ class DecisionTree(BaseEstimator):
         """
 
         # YOUR CODE HERE
+        
+        # threshold += self.EPS
+        mask = X_subset[:, feature_index] < threshold
+        X_left = X_subset[mask, :]
+        X_right = X_subset[~mask, :]
+        y_left = y_subset[mask, :]
+        y_right = y_subset[~mask, :]
         
         return (X_left, y_left), (X_right, y_right)
     
@@ -189,6 +222,9 @@ class DecisionTree(BaseEstimator):
         """
 
         # YOUR CODE HERE
+        mask = X_subset[:, feature_index] < threshold
+        y_left = y_subset[mask, :]
+        y_right = y_subset[~mask, :]
         
         return y_left, y_right
 
@@ -215,9 +251,73 @@ class DecisionTree(BaseEstimator):
 
         """
         # YOUR CODE HERE
-        return feature_index, threshold
+        current_criterion, is_classification = self.all_criterions[self.criterion_name]
+        H_lst = []
+        
+        for feature_idx in range(X_subset.shape[1]):
+            threshold_lst = sorted(list(set(X_subset[:, feature_idx])))
+            # from pdb import set_trace; set_trace()
+            if len(threshold_lst) <= 1:
+                continue
+
+            for threshold_idx in range(len(threshold_lst) - 1):
+                threshold = (threshold_lst[threshold_idx] + threshold_lst[threshold_idx + 1]) / 2
+                # threshold = threshold_lst[threshold_idx]
+                H = current_criterion(y_subset)
+                (X_left, y_left), (X_right, y_right) = self.make_split(feature_idx, threshold, X_subset, y_subset)
+                _, is_classification = self.all_criterions[self.criterion_name]
+
+                if is_classification:
+                    left_unique_labels = len(set(np.argmax(y_left, axis=1)))
+                    right_unique_labels = len(set(np.argmax(y_right, axis=1)))
+                else:
+                    left_unique_labels = len(set(y_left.reshape(-1)))
+                    right_unique_labels = len(set(y_right.reshape(-1)))
+
+                if left_unique_labels == 0 or right_unique_labels == 0:
+                    continue
+                left_criterion = current_criterion(y_left)
+                right_criterion = current_criterion(y_right)
+                
+                # if np.isnan(left_criterion) or np.isnan(right_criterion):
+                #     from pdb import set_trace; set_trace()
+                    
+                    
+                # assert not np.isnan(left_criterion), (
+                #     f"left_crit: {left_criterion}"
+                # )
+                # assert not np.isnan(right_criterion), (
+                #     f"right crit: {right_criterion}"
+                # )
+                
+                H -= X_left.shape[0] / X_subset.shape[0] * left_criterion
+                H -= X_right.shape[0] / X_subset.shape[0] * right_criterion
+                H_lst.append((H, feature_idx, threshold, X_left.shape[0], X_right.shape[0]))
+                
+        # from pdb import set_trace; set_trace()
+        best_values = sorted(H_lst, key=(lambda x: x[0]))[-1]
+        # print(best_values)
+        feature_index = best_values[1]
+        threshold = best_values[2]
+        
+        return (feature_index, threshold)
     
-    def make_tree(self, X_subset, y_subset):
+    def print_tree(self):
+        """
+        Print tree
+        """
+        
+        node_lst = [self.root]
+        
+        while len(node_lst) > 0:
+            node = node_lst.pop(0)
+            print(f"{node.value}\t{node.feature_index}\t{node.is_leaf}\t{node.label}")
+            if node.left_child != None:
+                node_lst.append(node.left_child)
+            if node.right_child != None:
+                node_lst.append(node.right_child)
+    
+    def make_tree(self, X_subset, y_subset, current_depth=1):
         """
         Recursively builds the tree
         
@@ -237,8 +337,45 @@ class DecisionTree(BaseEstimator):
         """
 
         # YOUR CODE HERE
+        # from pdb import set_trace; set_trace()
+        _, is_classification = self.all_criterions[self.criterion_name]
+
+        if is_classification:
+            unique_labels = len(set(np.argmax(y_subset, axis=1)))
+        else:
+            # from pdb import set_trace; set_trace()
+            unique_labels = len(set(y_subset.reshape(-1)))
         
-        return new_node
+        if X_subset.shape[0] <= self.min_samples_split or unique_labels == 1 or current_depth >= (self.max_depth):
+            root_node = Node(None, None)
+            root_node.is_leaf = True
+
+            if self.classification:
+                # from pdb import set_trace; set_trace()
+                counts = np.argmax(y_subset, axis=1)
+                probas = np.zeros((self.n_classes))
+                for i in counts:
+                    probas[i] += 1
+                probas /= y_subset.shape[0]
+                root_node.label = np.argmax(probas)
+                root_node.proba = probas
+            else:
+                root_node.label = np.mean(y_subset)
+                root_node.proba = None
+                
+            return root_node
+
+        feature_idx, threshold = self.choose_best_split(X_subset, y_subset)
+        (X_left, y_left), (X_right, y_right) = self.make_split(feature_idx, threshold, X_subset, y_subset)
+        root_node = Node(feature_idx, threshold)
+        
+        # print(X_left.shape)
+        # print(X_right.shape)
+        
+        root_node.left_child = self.make_tree(X_left, y_left, current_depth + 1)
+        root_node.right_child = self.make_tree(X_right, y_right, current_depth + 1)
+        
+        return root_node
         
     def fit(self, X, y):
         """
@@ -262,6 +399,7 @@ class DecisionTree(BaseEstimator):
             y = one_hot_encode(self.n_classes, y)
 
         self.root = self.make_tree(X, y)
+        # self.print_tree()
     
     def predict(self, X):
         """
@@ -281,6 +419,23 @@ class DecisionTree(BaseEstimator):
         """
 
         # YOUR CODE HERE
+        y_predicted = np.zeros((X.shape[0], 1))
+        
+        for obj_idx in range(X.shape[0]):
+            node = self.root
+            while not node.is_leaf:
+                feature_idx = node.feature_index
+                threshold = node.value
+                
+                if X[obj_idx, feature_idx] < threshold:
+                    node = node.left_child
+                    # print(f"{threshold}\t{feature_idx}\t{X[obj_idx, feature_idx]}\tLEFT")
+                else:
+                    # print(f"{threshold}\t{feature_idx}\t{X[obj_idx, feature_idx]}\tRIGHT")
+                    node = node.right_child
+                    
+            # print(f"RES = {node.label}")
+            y_predicted[obj_idx] = node.label
         
         return y_predicted
         
@@ -303,5 +458,24 @@ class DecisionTree(BaseEstimator):
         assert self.classification, 'Available only for classification problem'
 
         # YOUR CODE HERE
+        y_predicted = np.zeros((X.shape[0], self.n_classes))
+        
+        for obj_idx in range(X.shape[0]):
+            node = self.root
+            while not node.is_leaf:
+                feature_idx = node.feature_index
+                threshold = node.value
+                
+                if X[obj_idx, feature_idx] < threshold:
+                    node = node.left_child
+                    # print(f"{threshold}\t{feature_idx}\t{X[obj_idx, feature_idx]}\tLEFT")
+                else:
+                    # print(f"{threshold}\t{feature_idx}\t{X[obj_idx, feature_idx]}\tRIGHT")
+                    node = node.right_child
+                    
+            # print(f"RES = {node.label}")
+            y_predicted[obj_idx, :] = node.proba
+        
+        return y_predicted
         
         return y_predicted_probs
