@@ -1,2 +1,1 @@
-# made
-MADE Courses
+# MADE
