@@ -1,0 +1,14 @@
+# Jupyter checkpoints, python, pylint, ipython, pytest stats
+.ipynb_checkpoints
+.coverage
+__pycache__
+
+.vscode
+*.zip
+
+# ML Lab2 data
+ml/Lab2_Deep_Learning/data/*
+ml/Lab2_Deep_Learning
+
+# pickle dumps
+.pkl
