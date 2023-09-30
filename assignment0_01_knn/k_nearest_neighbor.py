@@ -173,9 +173,9 @@ class KNearestNeighbor:
             # label.                                                                #
             #########################################################################
             # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-            most_common_label = Counter(list(k_nearest_labels)).most_common()[0][0]
-            # most_common_label = np.bincount(k_nearest_labels[0]).argmax()
-            y_pred[i] = most_common_label
+            most_common = Counter(list(k_nearest)).most_common()
+            most_common = sorted(most_common, reverse=True, key=lambda x: (x[1], -x[0]))
+            y_pred[i] = most_common[0][0]
             # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
         return y_pred
